@@ -403,7 +403,13 @@ function resolveNextSessionState(input: {
   };
 }
 
-export function heartbeatService(db: Db) {
+export interface HeartbeatServiceOptions {
+  /** When false, wakeup requests are recorded in DB but agent processes are not spawned. Default: true. */
+  executionEnabled?: boolean;
+}
+
+export function heartbeatService(db: Db, opts?: HeartbeatServiceOptions) {
+  const executionEnabled = opts?.executionEnabled ?? (process.env.PAPERCLIP_AGENT_EXECUTION_ENABLED !== "false");
   const runLogStore = getRunLogStore();
   const secretsSvc = secretService(db);
 
@@ -1001,6 +1007,7 @@ export function heartbeatService(db: Db) {
   }
 
   async function startNextQueuedRunForAgent(agentId: string) {
+    if (!executionEnabled) return [];
     return withAgentStartLock(agentId, async () => {
       const agent = await getAgent(agentId);
       if (!agent) return [];
@@ -2204,6 +2211,22 @@ export function heartbeatService(db: Db) {
     wakeup: enqueueWakeup,
 
     reapOrphanedRuns,
+
+    /** Sweep all agents for queued runs and start them. Used by the scheduler to pick up runs enqueued by remote instances. */
+    sweepQueuedRuns: async () => {
+      if (!executionEnabled) return { started: 0 };
+      const queuedRuns = await db
+        .select({ agentId: heartbeatRuns.agentId })
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.status, "queued"))
+        .groupBy(heartbeatRuns.agentId);
+      let started = 0;
+      for (const { agentId } of queuedRuns) {
+        const claimed = await startNextQueuedRunForAgent(agentId);
+        started += claimed.length;
+      }
+      return { started };
+    },
 
     tickTimers: async (now = new Date()) => {
       const allAgents = await db.select().from(agents);

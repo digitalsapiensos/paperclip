@@ -60,6 +60,7 @@ export interface Config {
   storageS3ForcePathStyle: boolean;
   heartbeatSchedulerEnabled: boolean;
   heartbeatSchedulerIntervalMs: number;
+  agentExecutionEnabled: boolean;
   companyDeletionEnabled: boolean;
 }
 
@@ -242,6 +243,7 @@ export function loadConfig(): Config {
     storageS3ForcePathStyle,
     heartbeatSchedulerEnabled: process.env.HEARTBEAT_SCHEDULER_ENABLED !== "false",
     heartbeatSchedulerIntervalMs: Math.max(10000, Number(process.env.HEARTBEAT_SCHEDULER_INTERVAL_MS) || 30000),
+    agentExecutionEnabled: process.env.PAPERCLIP_AGENT_EXECUTION_ENABLED !== "false",
     companyDeletionEnabled,
   };
 }
