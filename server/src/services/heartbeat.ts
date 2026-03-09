@@ -904,11 +904,12 @@ export function heartbeatService(db: Db, opts?: HeartbeatServiceOptions) {
     const staleThresholdMs = opts?.staleThresholdMs ?? 0;
     const now = new Date();
 
-    // Find all runs in "queued" or "running" state
+    // Find runs in "running" state only — queued runs are legitimately waiting
+    // to be started (e.g. by sweepQueuedRuns in a hybrid deployment).
     const activeRuns = await db
       .select()
       .from(heartbeatRuns)
-      .where(inArray(heartbeatRuns.status, ["queued", "running"]));
+      .where(eq(heartbeatRuns.status, "running"));
 
     const reaped: string[] = [];
 
